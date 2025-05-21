@@ -1,4 +1,4 @@
-import { postData } from "../api/dataApi";
+import { sendMessageToBackend } from "../controllers/chat";
 import { useState } from "react";
 import { ChatWindow, ChatInput } from "../components";
 
@@ -17,17 +17,16 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, userMessage]);
 
         try {
-            const res = await postData({ message });
+            const responseText = await sendMessageToBackend(message);
 
             const botMessage = {
                 id: messages.length + 2,
                 from: "bot",
-                text: res.received.message || "No response",
+                text: responseText || "⚠️ No response from model",
             };
 
             setMessages((prev) => [...prev, botMessage]);
         } catch (err) {
-            console.error("Error from backend:", err);
             setMessages((prev) => [
                 ...prev,
                 {

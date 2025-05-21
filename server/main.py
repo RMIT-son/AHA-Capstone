@@ -1,19 +1,27 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
-from bson.objectid import ObjectId
+from routers import chat
 from util.db import collection
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
+app.include_router(chat.router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For development only — restrict in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# Define Pydantic model
 class Record(BaseModel):
     name: str
     score: float
 
-@app.get("/ping")
-def ping():
-    return {"message": "pong"}
-
+# CRUD endpoints for /records
 @app.post("/records")
 def add_record(record: Record):
     result = collection.insert_one(record.dict())
