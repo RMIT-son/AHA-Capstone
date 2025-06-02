@@ -1,23 +1,54 @@
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
-export async function sendMessageToBackend(message) {
+import axios from "axios";
+
+// Create a new conversation
+export const createConversation = async (user_id = "anonymous") => {
     try {
-        const response = await fetch(`${BACKEND_URL}/chat`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ message }),
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to get response from backend");
-        }
-
-        const data = await response.json();
-        return data.message;
+        const res = await axios.post("/api/conversations", { user_id });
+        return res.data; // { _id, user_id, messages: [] }
     } catch (error) {
-        console.error("Backend error:", error);
+        console.error("Failed to create conversation", error);
+        throw error;
+    }
+};
+
+// Send a message to a specific conversation
+export const sendMessageToConversation = async (
+    conversationId,
+    sender,
+    content
+) => {
+    try {
+        const res = await axios.post(
+            `/api/conversations/${conversationId}/message`,
+            {
+                sender,
+                content,
+            }
+        );
+        return res.data; // Updated conversation
+    } catch (error) {
+        console.error("Failed to send message", error);
+        throw error;
+    }
+};
+
+export const getAllConversations = async () => {
+    try {
+        const res = await axios.get("/api/conversations");
+        return res.data; 
+    } catch (error) {
+        console.error("Failed to load conversations", error);
+        return [];
+    }
+};
+
+export const getConversationById = async (conversationId) => {
+    try {
+        const res = await axios.get(`/api/conversations/${conversationId}`);
+        return res.data;
+    } catch (error) {
+        console.error("Failed to get conversation", error);
         return null;
     }
-}
+};
