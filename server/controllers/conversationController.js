@@ -17,7 +17,8 @@ exports.sendMessage = async (req, res) => {
         const { sender, content } = req.body;
 
         const conversation = await Conversation.findById(conversationId);
-        if (!conversation) return res.status(404).json({ error: "Not found" });
+        if (!conversation)
+            return res.status(404).json({ error: "Conversation not found" });
 
         conversation.messages.push({ sender, content, timestamp: new Date() });
 
