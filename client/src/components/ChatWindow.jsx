@@ -1,10 +1,9 @@
 import { useEffect, useRef } from "react";
+import MarkdownWrapper from "./MarkdownWrapper";
 
-// Simple copy to clipboard function
 const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(
         () => {
-            // Optional: Show a temporary "Copied!" message
             console.log("Text copied to clipboard");
         },
         (err) => {
@@ -29,7 +28,8 @@ export default function ChatWindow({ messages, isBotTyping }) {
                 className="h-full flex flex-col justify-end overflow-y-auto p-6 space-y-4"
             >
                 {messages.map((msg) => {
-                    const isUser = msg.from === "user";
+                    const isUser = msg.sender === "user";
+
                     return (
                         <div
                             key={msg.id}
@@ -38,7 +38,7 @@ export default function ChatWindow({ messages, isBotTyping }) {
                             }`}
                         >
                             {!isUser && (
-                                <div className="w-4 h-4 rounded-full bg-cyan-300 mt-2 mr-2 flex-shrink-0"></div> // Giữ lại style avatar bot ban đầu
+                                <div className="w-4 h-4 rounded-full bg-cyan-300 mt-2 mr-2 flex-shrink-0"></div>
                             )}
 
                             <div
@@ -48,12 +48,14 @@ export default function ChatWindow({ messages, isBotTyping }) {
                                         : "bg-white text-gray-900 border-l-4 border-[#002D74] rounded-r-sm rounded-t-sm rounded-b-sm"
                                 }`}
                                 style={{
-                                    // Hoàn nguyên inline style này
                                     maxWidth: "80%",
                                     wordWrap: "break-word",
                                 }}
                             >
-                                {msg.content || msg.text}
+                                <MarkdownWrapper
+                                    content={msg.content || msg.text}
+                                />
+
                                 <div className="text-xs mt-1.5 opacity-70">
                                     {msg.timestamp ||
                                         new Date(
