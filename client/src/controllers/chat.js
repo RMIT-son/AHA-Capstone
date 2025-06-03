@@ -1,11 +1,12 @@
-
 import axios from "axios";
+import { app } from "../config/keys";
 
-// Create a new conversation
 export const createConversation = async (user_id = "anonymous") => {
     try {
-        const res = await axios.post("/api/conversations", { user_id });
-        return res.data; // { _id, user_id, messages: [] }
+        const res = await axios.post(`${app.serverURL}/api/conversations`, {
+            user_id,
+        });
+        return res.data;
     } catch (error) {
         console.error("Failed to create conversation", error);
         throw error;
@@ -20,7 +21,7 @@ export const sendMessageToConversation = async (
 ) => {
     try {
         const res = await axios.post(
-            `/api/conversations/${conversationId}/message`,
+            `${app.serverURL}/api/conversations/${conversationId}/message`,
             {
                 sender,
                 content,
@@ -35,8 +36,8 @@ export const sendMessageToConversation = async (
 
 export const getAllConversations = async () => {
     try {
-        const res = await axios.get("/api/conversations");
-        return res.data; 
+        const res = await axios.get(`${app.serverURL}/api/conversations`);
+        return res.data;
     } catch (error) {
         console.error("Failed to load conversations", error);
         return [];
@@ -45,7 +46,9 @@ export const getAllConversations = async () => {
 
 export const getConversationById = async (conversationId) => {
     try {
-        const res = await axios.get(`/api/conversations/${conversationId}`);
+        const res = await axios.get(
+            `${app.serverURL}/api/conversations/${conversationId}`
+        );
         return res.data;
     } catch (error) {
         console.error("Failed to get conversation", error);
