@@ -7,11 +7,9 @@ const { port } = require("./config/keys");
 
 const conversationRoutes = require("./routes/conversationRoutes");
 
-
 const app = express();
 app.use(express.json());
 app.use(cors());
-
 
 connectDB();
 
