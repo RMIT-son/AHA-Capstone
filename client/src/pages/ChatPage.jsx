@@ -3,9 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ChatWindow, ChatInput, Sidebar } from "../components";
 import {
     createConversation,
-    sendMessageToConversation,
+    // sendMessageToConversation,
     getConversationById,
     getAllConversations,
+    streamFromBackend
 } from "../controllers/chat";
 
 export default function ChatPage() {
@@ -57,6 +58,14 @@ export default function ChatPage() {
         };
 
         loadChatData();
+        
+        // Expose streamFromBackend function for console testing
+        // You can now test it in browser console with: window.testStream("your test message")
+        window.testStream = streamFromBackend;
+        
+        // Optional: Log instructions for testing
+        console.log("🧪 Stream testing available! Use: window.testStream('your message')");
+        
     }, [chatId, navigate]);
 
     const handleSend = async (text) => {
@@ -83,21 +92,34 @@ export default function ChatPage() {
             }
 
             // 1. Immediately add user message to UI (optimistic update)
+            setMessages(prev => [...prev, tempBotMessage]);
+            // Create a placeholder for the bot message
+            const tempBotMessage = {
+                sender: "bot",
+                content: "",
+                timestamp: new Date().toISOString(),
+                tempId: Date.now() + 1
+            };
             setMessages(prevMessages => [...prevMessages, tempUserMessage]);
             setIsBotTyping(true);
             setIsLoadingInput(false); // User can send another message
 
-            // 2. Send message to backend and wait for bot response
-            console.log('Sending message to conversation:', currentChatId);
-            await sendMessageToConversation(currentChatId, "user", text);
-            
-            // 3. Replace optimistic message with real data from backend
-            const updated = await getConversationById(currentChatId);
-            
-            if (updated && updated.messages) {
-                setMessages(updated.messages);
-            }
+            // Start streaming response
+            await streamFromBackend(currentChatId, text, "user", (chunk) => {
+                setMessages(prevMessages => {
+                    const updated = [...prevMessages];
+                    const botIndex = updated.findIndex(msg => msg.tempId === tempBotMessage.tempId);
+                    if (botIndex !== -1) {
+                        updated[botIndex] = {
+                            ...updated[botIndex],
+                            content: updated[botIndex].content + chunk
+                        };
+                    }
+                    return updated;
+                });
+            });
 
+            
         } catch (err) {
             console.error("Error sending message:", err);
             
@@ -124,7 +146,7 @@ export default function ChatPage() {
     }`;
 
     return (
-        <div className="flex h-screen bg-[#F3F4F6] text-gray-800">
+        <div className="flex h-screen bg-[#F3F4F6] text-gray-800 overflow-hidden">
             <Sidebar
                 isOpen={isSidebarOpen}
                 chatRooms={chatRooms}
@@ -137,8 +159,9 @@ export default function ChatPage() {
                 }}
             />
 
-            <div className="flex-1 flex flex-col bg-white">
-                <div className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white">
+            <div className="flex-1 flex flex-col bg-white min-h-0">
+                {/* Fixed Header */}
+                <div className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white flex-shrink-0">
                     <div className="flex items-center">
                         <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -172,8 +195,11 @@ export default function ChatPage() {
                     </div>
                 </div>
 
-                <ChatWindow messages={messages} isBotTyping={isBotTyping} />
-                <ChatInput onSend={handleSend} isLoading={isLoadingInput} />
+                {/* Scrollable Chat Area */}
+                <div className="flex-1 min-h-0 flex flex-col">
+                    <ChatWindow messages={messages} isBotTyping={isBotTyping} />
+                    <ChatInput onSend={handleSend} isLoading={isLoadingInput} />
+                </div>
             </div>
         </div>
     );
