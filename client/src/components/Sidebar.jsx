@@ -37,7 +37,7 @@ const Sidebar = ({ isOpen, chatRooms = [], onSelectRoom, activeRoomId }) => {
                     scrollbarColor: 'white transparent' /* Firefox - white thumb, transparent track */
                 }}
             >
-                <style jsx>{`
+                <style jsx="true">{`
                     div::-webkit-scrollbar {
                         width: 6px; /* Make scrollbar thinner */
                     }

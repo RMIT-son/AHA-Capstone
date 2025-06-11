@@ -78,13 +78,20 @@ export const getConversationById = async (conversationId) => {
   }
 };
 
-export async function streamFromBackend(conversationId, content, sender, onChunk) {
-  console.log("Starting stream for conversation:", conversationId, "content:", content);
 
-  // Validate inputs
+// Best hybrid version - combines performance with reliability
+export async function streamFromBackend(conversationId, content, sender, onChunk) {
+  // Pre-validate to fail fast
   if (!conversationId || conversationId === 'undefined') {
     throw new Error("Conversation ID is required");
   }
+
+  // Pre-build request body to avoid JSON.stringify overhead during fetch
+  const requestBody = JSON.stringify({
+    sender,
+    content,
+    timestamp: new Date().toISOString()
+  });
 
   try {
     const response = await fetch(`${app.serverURL}/api/conversations/${conversationId}/stream`, {
@@ -93,62 +100,72 @@ export async function streamFromBackend(conversationId, content, sender, onChunk
         "Content-Type": "application/json",
         Accept: "text/event-stream",
         "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
-      body: JSON.stringify({
-        sender: sender,
-        content: content,
-        timestamp: new Date().toISOString()
-      }),
+      body: requestBody,
     });
 
     if (!response.ok || !response.body) {
-      console.error("Failed to connect to the backend");
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
+    const decoder = new TextDecoder();
 
     let buffer = "";
+    
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        console.log("Stream completed");
-        break;
-      }
+        // Decode and append to buffer
+        buffer += decoder.decode(value, { stream: true });
 
-      // Decode the chunk
-      const chunk = decoder.decode(value, { stream: true });
-      buffer += chunk;
+        // Handle both single-line and multi-line SSE events
+        // First try to process complete SSE events (ending with \n\n)
+        let eventEndIndex;
+        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+          const event = buffer.slice(0, eventEndIndex);
+          buffer = buffer.slice(eventEndIndex + 2);
 
-      // Process complete messages
-      const lines = buffer.split("\n\n");
-      
-      // Keep the last incomplete part in buffer
-      buffer = lines.pop() || "";
+          // Process the complete event
+          processSSEEvent(event, onChunk);
+        }
 
-      // Process each complete line
-      for (const line of lines) {
-        if (line.trim() && line.startsWith("data: ")) {
-          const data = line.slice("data: ".length);
+        // Fallback: if no complete events but we have single lines, process them
+        // This handles servers that send single-line events without \n\n
+        if (!buffer.includes('\n\n') && buffer.includes('\n')) {
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ""; // Keep last incomplete line
           
-          if (data === "[DONE]") {
-            console.log("Stream finished");
-            return;
-          }
-          
-          console.log("📦 Received chunk:", data);
-          
-          // Call the callback with the chunk
-          if (onChunk) {
-            onChunk(data);
+          for (const line of lines) {
+            if (line.trim().startsWith('data: ')) {
+              const data = line.trim().slice(6);
+              if (data === '[DONE]') return;
+              onChunk?.(data);
+            }
           }
         }
       }
+    } finally {
+      reader.releaseLock();
     }
   } catch (error) {
-    console.error("❌ Streaming error:", error);
+    console.error("Streaming error:", error);
     throw error;
   }
+}
+
+// Helper method for processing complete SSE events
+function processSSEEvent(event, onChunk) {
+  for (const line of event.split('\n')) {
+    const trimmedLine = line.trim();
+    if (trimmedLine.startsWith('data: ')) {
+      const data = trimmedLine.slice(6);
+      if (data === '[DONE]') return true; // Signal completion
+      onChunk?.(data);
+    }
+  }
+  return false;
 }

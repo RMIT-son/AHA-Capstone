@@ -59,18 +59,10 @@ export default function ChatPage() {
 
         loadChatData();
         
-        // Expose streamFromBackend function for console testing
-        // You can now test it in browser console with: window.testStream("your test message")
-        window.testStream = streamFromBackend;
-        
-        // Optional: Log instructions for testing
-        console.log("🧪 Stream testing available! Use: window.testStream('your message')");
-        
     }, [chatId, navigate]);
 
     const handleSend = async (text) => {
         setIsLoadingInput(true);
-
         // Generate temporary ID for optimistic update
         const tempUserMessage = {
             sender: "user",
@@ -78,10 +70,8 @@ export default function ChatPage() {
             timestamp: new Date().toISOString(),
             tempId: Date.now() // Temporary ID for tracking
         };
-
         try {
             let currentChatId = chatId;
-
             // Create new conversation if none exists
             if (!currentChatId || currentChatId === 'undefined') {
                 console.log('Creating new conversation for message');
@@ -90,35 +80,49 @@ export default function ChatPage() {
                 setChatId(newChat.id);
                 navigate(`/chat/${newChat.id}`);
             }
-
             // 1. Immediately add user message to UI (optimistic update)
-            setMessages(prev => [...prev, tempBotMessage]);
-            // Create a placeholder for the bot message
-            const tempBotMessage = {
-                sender: "bot",
-                content: "",
-                timestamp: new Date().toISOString(),
-                tempId: Date.now() + 1
-            };
             setMessages(prevMessages => [...prevMessages, tempUserMessage]);
+            
+            // 2. Set bot typing state (this will show the typing animation)
             setIsBotTyping(true);
             setIsLoadingInput(false); // User can send another message
-
-            // Start streaming response
+            
+            // 3. Start streaming response
+            let botMessageId = null;
+            let isFirstChunk = true;
+            
             await streamFromBackend(currentChatId, text, "user", (chunk) => {
+                // Turn off typing animation on first chunk
+                if (isFirstChunk) {
+                    setIsBotTyping(false);
+                    isFirstChunk = false;
+                }
+                
                 setMessages(prevMessages => {
                     const updated = [...prevMessages];
-                    const botIndex = updated.findIndex(msg => msg.tempId === tempBotMessage.tempId);
+                    
+                    // Find existing bot message or create new one
+                    const botIndex = updated.findIndex(msg => msg.tempId === botMessageId);
+                    
                     if (botIndex !== -1) {
+                        // Update existing bot message
                         updated[botIndex] = {
                             ...updated[botIndex],
                             content: updated[botIndex].content + chunk
                         };
+                    } else {
+                        // Create new bot message on first chunk
+                        botMessageId = Date.now();
+                        updated.push({
+                            sender: "bot",
+                            content: chunk,
+                            timestamp: new Date().toISOString(),
+                            tempId: botMessageId
+                        });
                     }
                     return updated;
                 });
             });
-
             
         } catch (err) {
             console.error("Error sending message:", err);
@@ -137,6 +141,7 @@ export default function ChatPage() {
             }]);
             
         } finally {
+            // Ensure typing is turned off (in case of errors before first chunk)
             setIsBotTyping(false);
         }
     };
